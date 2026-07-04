@@ -98,8 +98,10 @@ def main():
         opt.zero_grad(); loss.backward(); opt.step()
         if it % 300 == 0: print(f'  iter {it}/{ITERS} loss {loss.item():.4f}', flush=True)
 
+    torch.save(head.state_dict(), os.path.join(_ROOT, 'e2b_head.pth'))   # never lose training again
     # ---- eval: student tiled+Hann-stitched vs teacher ----
-    head.eval(); hw = torch.from_numpy(np.asarray(hann2d(CROP), dtype=np.float32))
+    head.eval()
+    hw = torch.as_tensor(np.asarray(hann2d(CROP), dtype=np.float32)).reshape(CROP, CROP)  # hann2d -> [1,1,C,C]
     gts, tms, sms = [], [], []
     for i, f in enumerate(tg + tb):
         tms.append(np.asarray(knn_map(enc, banks, load_img(f, SCALE), mb, LAYERS, nreg, gk, DEV, win, RES, sc), dtype=np.float32))
