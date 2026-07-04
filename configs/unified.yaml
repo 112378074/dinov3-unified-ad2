@@ -1,0 +1,8 @@
+# Unified-AD experiment config (design v0)
+backbone: dinov3_vit_huge_16
+n_proto: 64            # E2 ablation: 6 / 16 / 64 / 256
+distill_weight: 1.0    # L_distill weight (E1 sweep 0.3/1/3)
+seg_res: 512
+crop_size: 1024
+teacher_bank: {bank_imgs: 500, keep_frac: 0.3, max_bank: 150000, faithful: true}
+baseline_to_beat: {AUPRO: 72.20, AUROC: 84.56, SegF1: 63.69, ClassF1: 83.65}
