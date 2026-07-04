@@ -62,19 +62,38 @@ Measured per-image behavior (logs/5090/per_image_analysis.csv):
 | rice | 41.1 | .84 | 0 | 51 | healthy |
 | walnuts | 33.3 | .80 | 13 | 86 | healthy |
 
-Proposals (P1-P4 testable in the unified project; P5 for the dual-branch too):
-- **P1 per-image-aware threshold head.** vial/wallplugs show one global per-cat threshold cannot fit
-  every image. A small head predicting a per-image threshold offset from the image's own normal-score
-  statistics (trained on synthetic-val, never test) targets vial's 74% good-FP and wallplugs' 74% miss.
-- **P2 seg-from-float for sheet_metal-type cats.** peak-in-GT 97% but F1 .35 → binarize the FLOAT map
-  (head_D+gates) instead of the raw distance for cats where float ≫ binary.
-- **P3 small-defect recall (fabric).** fabric misses 73% of (small-defect) images while pixel-F1 stays
-  96 — dataset-level metric hides it. Add a per-image detection auxiliary loss (image-level BCE from
-  the seg head max) so small defects aren't ignored by area-dominated losses.
-- **P4 can: accept or sensor-level.** All representation-level routes measured dead (memory:
-  synth-content gap, high-freq drowned). Only unified-model hope: head_D distilled at hires + P1.
-- **P5 legitimacy.** Learned fusion/thresholds trained on synthetic-val replace every dev-set-tuned
-  constant — turns the audit flag into a design feature.
+Proposals — **post-adversarial-audit versions (2026-07-04; see dual-branch repo
+docs/ANALYSIS_2026-07-04.md for the full KILL/FIX record):**
+- ~~P1 per-image-aware threshold head~~ — **KILLED by audit.** (1) Conflicts with measured results:
+  per-image adaptive thresholding is anti-optimal for vial AUPRO (oracle 21.9). (2) Both stated
+  targets are not real levers: vial has 0/35 image-level FP on goods (the 74% figure is pixel-FP
+  images, handled by mis-seg proposals); wallplugs' misses are 51/67 ZERO-float-response
+  (representation failure — no threshold shift creates signal). (3) A head trained on regular-only
+  data is OOD exactly on the shifted/photometric variants it must serve.
+- **P2 (FIXED) per-cat binarization substrate decision** — binarize the FLOAT map instead of raw
+  distance where float ≫ binary (sheet_metal-type). Fix: the per-cat switch must be derived on
+  synthetic-validation (choosing by test peak-in-GT = test-GT routing). Runs SECOND in sequence
+  (all downstream binary proposals calibrate on this substrate).
+- ~~P3 fabric image-level auxiliary loss~~ — **KILLED by audit.** Redundant & indirect: fabric/1-3
+  (local-contrast rescue + hires-float + synth-val recalibration) attack the same two verified
+  failure modes with zero retrain and near-zero regression risk; an aux loss produces no pixels
+  (no SegF1/AUPRO path), needs new fusion constants (adds constant-debt P5 is repaying), and bakes
+  the synth≠real gap into weights instead of a revertible threshold. Revisit only if all three
+  fabric routes fail.
+- **P4 (FIXED) can = accept recall, attack the FP side.** Recall is structurally dead (83/84 missed,
+  GT median 4.5px sub-token; high-freq/synth routes measured dead). But can holds the dataset's
+  largest binary-FP pool (115.7k of 220.1k px, monotone with pose shift) → the live lever is FP
+  suppression (shape-prior specular/foil envelope from NORMAL-side statistics) for AUPRO/AUROC;
+  can SegF1 stays ~0 either way (TP ~4px).
+- **P5 (KEPT, runs FIRST) legitimacy re-calibration.** Rebuild every dev-set-tuned constant on an
+  AUGMENTED validation set (photometric+shift augmentation is mandatory — validation contains
+  regular-only images, a gap the audit caught in four separate proposals). Per-constant gating with
+  SAFE fallback; headline numbers expected flat or slightly down (honest baseline).
+
+The full corrected per-cat proposal set (27 items, tiered) lives in the dual-branch repo:
+`docs/ANALYSIS_2026-07-04.md`. Highest-value survivors: fabric/1+3 (ClassF1 ≈ +3 MEAN, the largest
+single lever), sheet_metal/1 hysteresis (29/31 float-fires-binary-dead + zero-FP headroom),
+rice/1 stage attribution (best-designed diagnostic), walnuts/1 (6×1197px literally-free TPs).
 
 ## 5. Experiment plan (each step gated on the previous)
 
