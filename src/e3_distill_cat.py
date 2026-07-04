@@ -53,7 +53,11 @@ def main():
     gk = get_gaussian_kernel(kernel_size=5, sigma=4).to(DEV)
     win = hann2d(CROP); photo = PhotometricAug()
     tr = sorted(glob.glob(os.path.join(DATA, CAT, 'train', 'good', '*.png'))); random.shuffle(tr)
-    bank_files, stu_files = tr[:BANK_IMGS], tr[BANK_IMGS:BANK_IMGS + STU_IMGS]
+    # adaptive split: small cats (sheet_metal 137, fj 263, vial 291, wallplugs 293 train imgs) can't
+    # afford bank=300 — take 70% for the bank (cap 300), rest for distillation (fixed E3a crash:
+    # tr[300:] was EMPTY -> "stack expects a non-empty TensorList").
+    bank_n = min(BANK_IMGS, max(60, int(len(tr) * 0.7)))
+    bank_files, stu_files = tr[:bank_n], tr[bank_n:bank_n + STU_IMGS]
     tg = sorted(glob.glob(os.path.join(DATA, CAT, 'test', 'good', '*.png')))
     tb = sorted(glob.glob(os.path.join(DATA, CAT, 'test', 'bad', '*.png')))
     mb = SimpleNamespace(scale=SCALE, crop_size=CROP, overlap=128, metric='l2', keep_frac=0.3,
