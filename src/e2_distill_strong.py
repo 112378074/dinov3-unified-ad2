@@ -108,9 +108,13 @@ def main():
         with torch.no_grad():
             sms.append((head(feats(enc, f).float()).squeeze() * sd + mu).cpu().numpy())
         stem = os.path.splitext(os.path.basename(f))[0]
+        # GT ONLY for bad-split files: AD2 good/bad share stems (000_regular.png exists in BOTH),
+        # so an unconditional mask lookup assigns phantom GT to good images (measured: 42.16 -> 25.44
+        # AUPRO distortion on identical maps). This bug invalidated the first E1/E2a gate numbers.
+        is_bad = ('\\bad\\' in f) or ('/bad/' in f)
         gp = os.path.join(DATA, CAT, 'ground_truth', 'bad', stem + '_mask.png')
         g = (np.array(Image.open(gp).convert('L').resize((RES, RES), Image.NEAREST)) > 0).astype(np.uint8) \
-            if os.path.exists(gp) else np.zeros((RES, RES), np.uint8)
+            if (is_bad and os.path.exists(gp)) else np.zeros((RES, RES), np.uint8)
         gts.append(g)
         if i % 40 == 0:
             print(f'  test maps {i}/{len(tg)+len(tb)}', flush=True)
@@ -124,6 +128,8 @@ def main():
     print(f'[E2a GATE {"PASS" if ratio >= 0.95 else "FAIL"}] (student >= 95% of deployment-grade teacher)', flush=True)
     json.dump({'teacher_aupro': pro_t, 'student_aupro': pro_s, 'ratio': ratio, 'corr': corr},
               open(os.path.join(_ROOT, 'e2a_result.json'), 'w'), indent=1)
+    np.savez_compressed(os.path.join(_ROOT, 'e2a_maps.npz'), tms=tms, sms=sms, gts=gts,
+                        files=np.array(tg + tb))          # saved -> gate re-analysis is offline
 
 
 if __name__ == '__main__':
