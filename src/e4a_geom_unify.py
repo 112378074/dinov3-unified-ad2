@@ -102,7 +102,8 @@ def main():
         if i < N_SYN:
             variants.append(las_augment(img, dtd)[0])
         for v in variants:
-            for til, x, y in img_tiles(v):
+            tiles_v, _, _ = img_tiles(v)
+            for til, x, y in tiles_v:
                 TIL.append(til.copy()); TGT.append(teacher_tile_target(til))
         if i % 20 == 0:
             print(f'  distill imgs {i}/{len(stu_files)} tiles={len(TIL)}', flush=True)
