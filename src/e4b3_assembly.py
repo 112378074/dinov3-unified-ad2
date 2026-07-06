@@ -81,7 +81,15 @@ class UnifiedNet(nn.Module):
         toks = [t.float() for t in toks]
         B = x.shape[0]
         side = int(math.sqrt(toks[0].shape[1] - 1 - nreg))
-        fa = [toks[i][:, 1 + nreg:, :].permute(0, 2, 1).reshape(B, -1, side, side) for i in A_IDX]
+        # A-slice must match the PUBLIC get_intermediate_layers diet (norm=True) head_D was trained
+        # on — raw tokens scored 4.74 vs 45.53. B-slice stays RAW (INPFormerPP uses the private API).
+        def pub_norm(t):
+            with torch.no_grad():
+                nw = next(self.enc.norm.parameters()).dtype
+                if getattr(self.enc, 'untie_cls_and_patch_norms', False):
+                    return self.enc.norm(t[:, 1 + nreg:, :].to(nw)).float()
+                return self.enc.norm(t.to(nw))[:, 1 + nreg:, :].float()
+        fa = [pub_norm(toks[i]).permute(0, 2, 1).reshape(B, -1, side, side) for i in A_IDX]
         return torch.cat(fa, 1).contiguous(), [toks[i] for i in B_IDX]
 
     def trunk_from_tokens(self, en_list, B):
